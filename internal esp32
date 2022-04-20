@@ -1,0 +1,283 @@
+esphome:
+  name: internalesp32
+  includes:
+    - include/veml7700_custom_sensor.h
+  libraries:
+    - Wire
+    - SPI
+    - AdaFruit/Adafruit BusIO @ 1.11.3
+    - AdaFruit VEML7700=https://github.com/adafruit/Adafruit_VEML7700
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+  password: "************************"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Internalesp32 Fallback Hotspot"
+    password: "*************"
+
+captive_portal:
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+
+bme680_bsec:
+    # i2c address
+    # -----------
+    # Common values are:
+    # - 0x76
+    # - 0x77
+    # Default: 0x76
+    address: 0x76
+
+    # Temperature offset
+    # ------------------
+    # Useful if device is in enclosure and reads too high
+    # Default: 0
+    temperature_offset: 0
+
+    # IAQ calculation mode
+    # --------------------
+    # Available options:
+    # - static (for fixed position devices)
+    # - mobile (for on person or other moveable devices)
+    # Default: static
+    iaq_mode: static
+
+    # Sample rate
+    # -----------
+    # Available options:
+    # - lp (low power - samples every 3 seconds)
+    # - ulp (ultra low power - samples every 5 minutes)
+    # Default: lp
+    sample_rate: lp
+
+    # Interval at which to save BSEC state
+    # ------------------------------------
+    # Default: 6h
+    state_save_interval: 6h
+
+sensor:
+  - platform: bme680_bsec
+    temperature:
+      # Temperature in °C
+      name: "BME680 Temperature"
+      sample_rate: lp
+      id: temp
+      filters:
+        - or:
+          - throttle: 1s
+          - delta: 5.0
+    pressure:
+      # Pressure in hPa
+      name: "BME680 Pressure"
+      sample_rate: lp
+      id: pressure
+      filters:
+        - median
+    humidity:
+      # Relative humidity %
+      name: "BME680 Humidity"
+      sample_rate: lp
+      id: humidity
+      filters:
+        - median
+    gas_resistance:
+      # Gas resistance in Ω
+      name: "BME680 Gas Resistance"
+      filters:
+        - median
+    iaq:
+      # Indoor air quality value
+      name: "BME680 IAQ"
+      id: iaq
+      filters:
+        - median
+    iaq_accuracy:
+      # IAQ accuracy as a numeric value of 0, 1, 2, 3
+      name: "BME680 Numeric IAQ Accuracy"
+    co2_equivalent:
+      # CO2 equivalent estimate in ppm
+      name: "BME680 CO2 Equivalent"
+      id: co2
+      filters:
+        - median
+    breath_voc_equivalent:
+      # Volatile organic compounds equivalent estimate in ppm
+      name: "BME680 Breath VOC Equivalent"
+      filters:
+        - median
+#uptime
+  - platform: uptime
+    name: "Benti ESP32 Uptime"
+    id: uptime_sensor
+    update_interval: 60s
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_bentiesp32lolin32
+            state: !lambda |-
+              int seconds = round(id(uptime_sensor).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return (
+                (days ? to_string(days) + "d " : "") +
+                (hours ? to_string(hours) + "h " : "") +
+                (minutes ? to_string(minutes) + "m " : "") +
+                (to_string(seconds) + "s")
+              ).c_str();
+#Wifi
+  - platform: wifi_signal
+    name: "Internalesp32 Wifi Signal"
+    update_interval: 30s
+#kinti homero
+  - platform: homeassistant
+    id: kinti_homero
+    entity_id: sensor.bme680_temperature_2
+    internal: true
+  - platform: homeassistant
+    id: kinti_para
+    entity_id: sensor.bme680_humidity_2
+	internal: true
+  - platform: homeassistant
+    id: kinti_iaq
+    entity_id: sensor.bme680_iaq_2
+	internal: true
+  - platform: homeassistant
+    id: kinti_nyomas
+    entity_id: sensor.bme680_pressure_2
+	internal: true
+#VEML7700
+  - platform: custom
+    lambda: |-
+      auto veml7700 = new VEML7700CustomSensor();
+      App.register_component(veml7700);
+      return {veml7700, veml7700->lux_sensor, veml7700->white_sensor, veml7700->als_sensor,};
+    sensors:
+    - name: "VEML7700 Light" # Required dummy sensor
+    - name: "VEML770 Lux"
+      accuracy_decimals: 1
+      unit_of_measurement: Lux
+      id: light
+    - name: "VEML770 White"
+      unit_of_measurement: Lux
+      accuracy_decimals: 0
+    - name: "VEML770 ALS"
+      unit_of_measurement: Lux
+      accuracy_decimals: 0
+
+#it.printf(0, 3, "Pres: %.1fhPa",id(pressure).state);
+globals:
+  - id: page
+    type: int
+    initial_value: "0"
+interval:
+  - interval: 30s
+    then:
+      - lambda: id(page) = (id(page) + 1) % 3;
+
+display:
+  - platform: lcd_pcf8574
+    dimensions: 20x4
+    address: 0x27
+    lambda: |-
+      char *state = "OFF";
+      if(id(relay_heater).state)
+        state = "FUTES";
+      else if(id(relay_cooler).state)
+        state = "HUTES";
+      switch (id(page)){
+        case 0:
+        it.strftime(0 , 0, "%H:%M on %Y.%m.%d", id(my_time).now());
+        it.printf(0, 1, "Inside temp: %.1fC", id(temp).state);
+        it.printf(0, 2, "Inside hum: %.1f%%", id(humidity).state);
+        it.printf(0, 3, "Allapot: %s", state);
+          break;
+        case 1:
+        it.printf(0, 0, "Outside temp:%.1fC", id(kinti_homero).state);
+        it.printf(0, 1, "Outside hum: %.1f%%", id(kinti_para).state);
+        it.printf(0, 2, "Pres inside:%.0fhPa",id(pressure).state);
+        it.printf(0, 3, "Pres outside:%.0fhPa",id(kinti_nyomas).state);
+          break;
+        case 2:
+        it.printf(0, 0, "IAQ inside:%.1f", id(iaq).state);
+        it.printf(0, 1, "IAQ outside:%.1f", id(kinti_iaq).state);
+        it.printf(0, 2, "EQV CO2 in:%.1fPPM", id(co2).state);
+        it.printf(0, 3, "Light:%.1flux",id(light).state);
+          break;
+      }
+      
+time:
+- platform: sntp
+  id: my_time
+switch:
+  - platform: gpio
+    pin: 18
+    id: relay_heater
+    name: "Heater"
+  - platform: gpio
+    pin: 23
+    id: relay_cooler
+    name: "AC"
+
+
+climate:
+  - platform: thermostat
+    name: "Thermostat Climate Controller"
+    visual:
+      min_temperature: 16 °C
+      max_temperature: 28 °C
+      temperature_step: 0.1 °C
+    sensor: temp
+    default_target_temperature_low: 20 °C
+    default_target_temperature_high: 22 °C
+    min_cooling_off_time: 300s
+    min_cooling_run_time: 300s
+    min_heating_off_time: 300s
+    min_heating_run_time: 300s
+    min_idle_time: 10min
+    cool_action:
+      - switch.turn_on: relay_cooler
+    heat_action:
+      - switch.turn_on: relay_heater
+    idle_action:
+      - switch.turn_off: relay_cooler
+      - switch.turn_off: relay_heater
+
+    heat_deadband: 0.4
+    heat_overrun: 0.6
+    cool_deadband: 0.3
+    cool_overrun: 0.7
+    away_config:
+      default_target_temperature_low: 17
+      default_target_temperature_high: 27
+
+text_sensor:
+  - platform: bme680_bsec
+    iaq_accuracy:
+      # IAQ accuracy as a text value of Stabilizing, Uncertain, Calibrating, Calibrated
+      name: "BME680 IAQ Accuracy"
+  - platform: template
+    name: Uptime Benti ESP32
+    id: uptime_bentiesp32lolin32
+    icon: mdi:clock-start
