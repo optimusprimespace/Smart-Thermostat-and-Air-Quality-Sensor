@@ -125,13 +125,13 @@ sensor:
         - median
 #uptime
   - platform: uptime
-    name: "Benti ESP32 Uptime"
+    name: "ESP32 Uptime"
     id: uptime_sensor
     update_interval: 60s
     on_raw_value:
       then:
         - text_sensor.template.publish:
-            id: uptime_bentiesp32lolin32
+            id: uptime_esp32
             state: !lambda |-
               int seconds = round(id(uptime_sensor).raw_state);
               int days = seconds / (24 * 3600);
@@ -152,19 +152,19 @@ sensor:
     update_interval: 30s
 #kinti homero
   - platform: homeassistant
-    id: kinti_homero
+    id: outside_temp
     entity_id: sensor.bme680_temperature_2
     internal: true
   - platform: homeassistant
-    id: kinti_para
+    id: outside_hum
     entity_id: sensor.bme680_humidity_2
 	internal: true
   - platform: homeassistant
-    id: kinti_iaq
+    id: external_iaq
     entity_id: sensor.bme680_iaq_2
 	internal: true
   - platform: homeassistant
-    id: kinti_nyomas
+    id: external_press
     entity_id: sensor.bme680_pressure_2
 	internal: true
 #VEML7700
@@ -186,11 +186,19 @@ sensor:
       unit_of_measurement: Lux
       accuracy_decimals: 0
 
+#Delta sensor
+  - platform: template
+    name: "Delta Temp"
+    lambda: |-
+	return id(temp).state - id(outside_temp).state;
+    update_interval: 10s
+    internal: false
 #it.printf(0, 3, "Pres: %.1fhPa",id(pressure).state);
 globals:
   - id: page
     type: int
     initial_value: "0"
+
 interval:
   - interval: 30s
     then:
@@ -211,17 +219,17 @@ display:
         it.strftime(0 , 0, "%H:%M on %Y.%m.%d", id(my_time).now());
         it.printf(0, 1, "Inside temp: %.1fC", id(temp).state);
         it.printf(0, 2, "Inside hum: %.1f%%", id(humidity).state);
-        it.printf(0, 3, "Allapot: %s", state);
+        it.printf(0, 3, "State: %s", state);
           break;
         case 1:
-        it.printf(0, 0, "Outside temp:%.1fC", id(kinti_homero).state);
-        it.printf(0, 1, "Outside hum: %.1f%%", id(kinti_para).state);
+        it.printf(0, 0, "Outside temp:%.1fC", id(outside_homero).state);
+        it.printf(0, 1, "Outside hum: %.1f%%", id(outside_hum).state);
         it.printf(0, 2, "Pres inside:%.0fhPa",id(pressure).state);
-        it.printf(0, 3, "Pres outside:%.0fhPa",id(kinti_nyomas).state);
+        it.printf(0, 3, "Pres outside:%.0fhPa",id(external_press).state);
           break;
         case 2:
         it.printf(0, 0, "IAQ inside:%.1f", id(iaq).state);
-        it.printf(0, 1, "IAQ outside:%.1f", id(kinti_iaq).state);
+        it.printf(0, 1, "IAQ outside:%.1f", id(external_iaq).state);
         it.printf(0, 2, "EQV CO2 in:%.1fPPM", id(co2).state);
         it.printf(0, 3, "Light:%.1flux",id(light).state);
           break;
@@ -279,5 +287,5 @@ text_sensor:
       name: "BME680 IAQ Accuracy"
   - platform: template
     name: Uptime Benti ESP32
-    id: uptime_bentiesp32lolin32
+    id: uptime_esp32
     icon: mdi:clock-start
