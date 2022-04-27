@@ -1,5 +1,5 @@
 esphome:
-  name: internalesp32
+  name: bentiesp32lolin32
   includes:
     - include/veml7700_custom_sensor.h
   libraries:
@@ -17,11 +17,10 @@ logger:
 
 # Enable Home Assistant API
 api:
-  #password: !secret api_password
-  encryption: 
-    key: ************************
+  encryption:
+    key: *******************************
 ota:
-  password: "************************"
+  password: "**************************************"
 
 wifi:
   ssid: !secret wifi_ssid
@@ -29,8 +28,8 @@ wifi:
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "Internalesp32 Fallback Hotspot"
-    password: "*************"
+    ssid: "Wemoslolin32 Fallback Hotspot"
+    password: "**********************"
 
 captive_portal:
 
@@ -84,8 +83,8 @@ sensor:
       id: temp
       filters:
         - or:
-          - throttle: 1s
-          - delta: 5.0
+          - throttle: 10s
+          - delta: 3.0
     pressure:
       # Pressure in hPa
       name: "BME680 Pressure"
@@ -125,15 +124,26 @@ sensor:
       name: "BME680 Breath VOC Equivalent"
       filters:
         - median
+  #- platform: ltr390
+  #  uv:
+  #    name: "UV Index"
+  #  light:
+  #    name: "Light"
+  #  ambient_light:
+  #    name: "ALS"
+  #  gain: X3
+  #  resolution: 19
+  #  address: 0x53
+  #  update_interval: 15s
 #uptime
   - platform: uptime
-    name: "ESP32 Uptime"
+    name: "Benti ESP32 Uptime"
     id: uptime_sensor
     update_interval: 60s
     on_raw_value:
       then:
         - text_sensor.template.publish:
-            id: uptime_esp32
+            id: uptime_bentiesp32lolin32
             state: !lambda |-
               int seconds = round(id(uptime_sensor).raw_state);
               int days = seconds / (24 * 3600);
@@ -150,25 +160,25 @@ sensor:
               ).c_str();
 #Wifi
   - platform: wifi_signal
-    name: "Internalesp32 Wifi Signal"
+    name: "Wemoslolin32 Wifi Signal"
     update_interval: 30s
 #kinti homero
   - platform: homeassistant
-    id: outside_temp
+    id: kinti_homero
     entity_id: sensor.bme680_temperature_2
     internal: true
   - platform: homeassistant
-    id: outside_hum
+    id: kinti_para
     entity_id: sensor.bme680_humidity_2
-	internal: true
+    internal: true
   - platform: homeassistant
-    id: external_iaq
+    id: kinti_iaq
     entity_id: sensor.bme680_iaq_2
-	internal: true
+    internal: true
   - platform: homeassistant
-    id: external_press
+    id: kinti_nyomas
     entity_id: sensor.bme680_pressure_2
-	internal: true
+    internal: true
 #VEML7700
   - platform: custom
     lambda: |-
@@ -177,30 +187,29 @@ sensor:
       return {veml7700, veml7700->lux_sensor, veml7700->white_sensor, veml7700->als_sensor,};
     sensors:
     - name: "VEML7700 Light" # Required dummy sensor
-    - name: "VEML770 Lux"
+    - name: "VEML7700 Lux"
       accuracy_decimals: 1
       unit_of_measurement: Lux
       id: light
-    - name: "VEML770 White"
+      filters:
+        - median
+    - name: "VEML7700 White"
       unit_of_measurement: Lux
       accuracy_decimals: 0
-    - name: "VEML770 ALS"
+    - name: "VEML7700 ALS"
       unit_of_measurement: Lux
       accuracy_decimals: 0
-
 #Delta sensor
   - platform: template
     name: "Delta Temp"
     lambda: |-
-	return id(temp).state - id(outside_temp).state;
+      return id(temp).state - id(kinti_homero).state;
     update_interval: 10s
     internal: false
-#it.printf(0, 3, "Pres: %.1fhPa",id(pressure).state);
 globals:
   - id: page
     type: int
     initial_value: "0"
-
 interval:
   - interval: 30s
     then:
@@ -221,22 +230,26 @@ display:
         it.strftime(0 , 0, "%H:%M on %Y.%m.%d", id(my_time).now());
         it.printf(0, 1, "Inside temp: %.1fC", id(temp).state);
         it.printf(0, 2, "Inside hum: %.1f%%", id(humidity).state);
-        it.printf(0, 3, "State: %s", state);
+        it.printf(0, 3, "Allapot: %s", state);
           break;
         case 1:
-        it.printf(0, 0, "Outside temp:%.1fC", id(outside_homero).state);
-        it.printf(0, 1, "Outside hum: %.1f%%", id(outside_hum).state);
+        it.printf(0, 0, "Outside temp:%.1fC", id(kinti_homero).state);
+        it.printf(0, 1, "Outside hum: %.1f%%", id(kinti_para).state);
         it.printf(0, 2, "Pres inside:%.0fhPa",id(pressure).state);
-        it.printf(0, 3, "Pres outside:%.0fhPa",id(external_press).state);
+        it.printf(0, 3, "Pres outside:%.0fhPa",id(kinti_nyomas).state);
           break;
         case 2:
         it.printf(0, 0, "IAQ inside:%.1f", id(iaq).state);
-        it.printf(0, 1, "IAQ outside:%.1f", id(external_iaq).state);
+        it.printf(0, 1, "IAQ outside:%.1f", id(kinti_iaq).state);
         it.printf(0, 2, "EQV CO2 in:%.1fPPM", id(co2).state);
         it.printf(0, 3, "Light:%.1flux",id(light).state);
           break;
       }
-      
+
+#interval:
+#  - interval: 1s
+#    then:
+#     - component.update: lcd
 time:
 - platform: sntp
   id: my_time
@@ -245,11 +258,12 @@ switch:
     pin: 18
     id: relay_heater
     name: "Heater"
+    inverted: true
   - platform: gpio
     pin: 23
     id: relay_cooler
     name: "AC"
-
+    inverted: true
 
 climate:
   - platform: thermostat
@@ -265,7 +279,7 @@ climate:
     min_cooling_run_time: 300s
     min_heating_off_time: 300s
     min_heating_run_time: 300s
-    min_idle_time: 10min
+    min_idle_time: 5min
     cool_action:
       - switch.turn_on: relay_cooler
     heat_action:
@@ -289,5 +303,5 @@ text_sensor:
       name: "BME680 IAQ Accuracy"
   - platform: template
     name: Uptime Benti ESP32
-    id: uptime_esp32
+    id: uptime_bentiesp32lolin32
     icon: mdi:clock-start
