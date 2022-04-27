@@ -1,2 +1,7 @@
-https://commons.wikimedia.org/wiki/File:OfficeThermostat.jpg
 https://ourworldindata.org/emissions-by-sector
+By The original uploader was Dante Alighieri at English Wikipedia. - Transferred from en.wikipedia to Commons., CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=4036096
+https://www.aceee.org/files/proceedings/1988/data/papers/1988_V10_017.pdf
+https://media.digikey.com/Photos/Vishay%20Semiconductors/MFG_VEML7700-TR.JPG
+https://learn.adafruit.com/assets/109029
+https://media.digikey.com/Photos/Bosch%20Sensortec/MFG_BME680.jpg
+https://itbrainpower.net/sensors/BME688-BVOC-VSC-TEMPERATURE-HUMIDITY-PRESSURE-I2C-AI-DIGITAL-NOSE-sensor-breakout
